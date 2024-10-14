@@ -46,8 +46,10 @@ func run(system string, configFilePath string) {
 			os.Exit(1)
 		}
 
-		cedCore := ced.NewCEDCore(setupCtx(), &cedConf.CED)
+		ctx := setupCtx()
+		cedCore := ced.NewCEDCore(ctx, &cedConf.CED)
 		cedCore.Simulate()
+		cedCore.Wait()
 	} else {
 		slog.Info("only ced is supported as a system as of now")
 		os.Exit(1)

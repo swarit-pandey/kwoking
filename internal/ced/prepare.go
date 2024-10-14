@@ -102,3 +102,33 @@ func (cc *CEDCore) prepareAndFlushPods() {
 		cc.flush(detailsInBytes)
 	}
 }
+
+func (cc *CEDCore) flushRefresh() {
+	resourceList := &siaproto.ResourceList{
+		ClusterId:      cc.config.Simulate.ClusterID,
+		WorkspaceId:    cc.config.Simulate.WorkspaceID,
+		NodeArray:      cc.resources.nodesList,
+		NamespaceArray: cc.resources.namespacesList,
+		PodArray:       cc.resources.podsList,
+	}
+
+	slog.Info("", slog.Any("len(ns)", len(cc.resources.namespacesList)), slog.Any("len(node)", len(cc.resources.nodesList)), slog.Any("len(pods)", len(cc.resources.podsList)))
+
+	details := siaproto.EntityDetails{
+		EntityType:          "currentResource",
+		NamespaceList:       nil,
+		PodList:             nil,
+		CurrentResourceList: resourceList,
+		Workloads:           nil,
+		Services:            nil,
+		Heartbeat:           nil,
+	}
+
+	detailsInBytes, err := proto.Marshal(&details)
+	if err != nil {
+		slog.Error("failed to flush event", slog.Any("details", resourceList), slog.Any("error", err))
+		return
+	}
+
+	cc.flush(detailsInBytes)
+}

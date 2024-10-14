@@ -13,7 +13,6 @@ func (cc *CEDCore) simulateNodes(op Operation) []string {
 	if numSimulatedNodes == 0 {
 		numSimulatedNodes = 50 // By default we simulate a cluster of 50 nodes
 	}
-	var allSimulatedNodes []string
 
 	for i := 0; i < numSimulatedNodes; i++ {
 		simulateNodeName := getUniqueName(resourcePrefix)
@@ -30,11 +29,11 @@ func (cc *CEDCore) simulateNodes(op Operation) []string {
 			NewNodeName:     simulateNodeName,
 			OldNodeName:     simulateOldNodeName,
 		})
-		allSimulatedNodes = append(allSimulatedNodes, simulateNodeName)
+		cc.resources.nodesList = append(cc.resources.nodesList, simulateNodeName)
 	}
 
 	cc.resources.nodes = simulatedNodes
-	return allSimulatedNodes
+	return cc.resources.nodesList
 }
 
 func (cc *CEDCore) simulateNamespaces(op Operation) []string {
@@ -44,7 +43,6 @@ func (cc *CEDCore) simulateNamespaces(op Operation) []string {
 	if numSimulatedNamespaces == 0 {
 		numSimulatedNamespaces = 50
 	}
-	var allSimulatedNamespaces []string
 
 	for i := 0; i < numSimulatedNamespaces; i++ {
 		simulatedNSName := getUniqueName(resourcePrefix)
@@ -52,7 +50,6 @@ func (cc *CEDCore) simulateNamespaces(op Operation) []string {
 		if op == Updated {
 			simulateOldNSName = getUniqueName(resourcePrefix)
 		}
-		allSimulatedNamespaces = append(allSimulatedNamespaces, simulatedNSName)
 		simulatedNamespaces = append(simulatedNamespaces, &siaproto.NamespaceDetails{
 			ClusterId:               cc.config.Simulate.ClusterID,
 			WorkspaceId:             cc.config.Simulate.WorkspaceID,
@@ -64,10 +61,11 @@ func (cc *CEDCore) simulateNamespaces(op Operation) []string {
 			KubearmorFilePosture:    "kubearmor-file-posture",
 			KubearmorNetworkPosture: "kubearmor-network-posture",
 		})
+		cc.resources.namespacesList = append(cc.resources.namespacesList, simulatedNSName)
 	}
 
 	cc.resources.namespaces = simulatedNamespaces
-	return allSimulatedNamespaces
+	return cc.resources.namespacesList
 }
 
 func (cc *CEDCore) simulatePods(op Operation, nsName, nodeName string) {
@@ -101,6 +99,7 @@ func (cc *CEDCore) simulatePods(op Operation, nsName, nodeName string) {
 			Container:       simulatedContainers,
 			WorkloadType:    getOneOf([]string{"job", "cronjob", "deployment", "replicaset"}),
 		})
+		cc.resources.podsList = append(cc.resources.podsList, simulatedPodName)
 	}
 
 	cc.resources.pods = simualatedPods

@@ -7,6 +7,7 @@ import (
 	"time"
 
 	siaproto "github.com/accuknox/shared-informer-agent/protoP"
+	"github.com/go-co-op/gocron"
 	"github.com/swarit-pandey/kwoking/internal/common"
 	"github.com/swarit-pandey/kwoking/internal/config"
 	"github.com/swarit-pandey/kwoking/internal/rmq"
@@ -26,6 +27,10 @@ type resources struct {
 	pods       []*siaproto.PodDetails
 	containers []*siaproto.ContainerDetails
 	workloads  []*siaproto.Workload
+
+	nodesList      []string
+	namespacesList []string
+	podsList       []string
 }
 
 type CEDCore struct {
@@ -34,6 +39,8 @@ type CEDCore struct {
 	publisher *rmq.Publisher
 	resources *resources
 	labels    []*siaproto.Labels
+	scheduler *gocron.Scheduler
+	done      chan struct{}
 }
 
 func NewCEDCore(ctx context.Context, config *config.CED) *CEDCore {
@@ -41,12 +48,14 @@ func NewCEDCore(ctx context.Context, config *config.CED) *CEDCore {
 		config:    config,
 		ctx:       ctx,
 		resources: &resources{},
+		done:      make(chan struct{}),
 	}
 
 	if !cc.config.DryRun {
 		cc.publisher = cc.setupPublisher()
 	}
 	cc.generateAndCacheLabels(50)
+	cc.scheduler = gocron.NewScheduler(time.UTC)
 
 	return cc
 }
@@ -78,11 +87,28 @@ func (cc *CEDCore) Simulate() {
 
 	if !cc.config.DryRun {
 		slog.Info("Preparing and flushing data")
-		cc.prepareAndFlushWorkloads()
+		cc.prepareAndFlushNode()
 		cc.prepareAndFlushNS()
 		cc.prepareAndFlushPods()
-		cc.prepareAndFlushNode()
+		cc.prepareAndFlushWorkloads()
+		cc.flushRefresh()
+
+		go cc.refreshResources()
 	}
+}
+
+func (cc *CEDCore) refreshResources() {
+	_, err := cc.scheduler.Every(2).Minutes().Do(cc.flushRefresh)
+	if err != nil {
+		slog.Error("failed to schedule flushRefresh", slog.Any("error", err))
+		return
+	}
+
+	cc.scheduler.StartAsync()
+
+	<-cc.ctx.Done()
+	cc.scheduler.Stop()
+	close(cc.done)
 }
 
 func (cc *CEDCore) setupSimulation() {
@@ -154,4 +180,8 @@ func (cc *CEDCore) getRandomLabels(u, l int) []*siaproto.Labels {
 	copy(shuffled, cc.labels)
 	rnd.Shuffle(len(shuffled), func(i, j int) { shuffled[i], shuffled[j] = shuffled[j], shuffled[i] })
 	return shuffled[:fn]
+}
+
+func (cc *CEDCore) Wait() {
+	<-cc.done
 }
